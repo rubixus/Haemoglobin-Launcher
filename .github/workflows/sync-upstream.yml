@@ -1,0 +1,85 @@
+name: Sync upstream
+
+# Keeps Haemoglobin fork up to date with PrismLauncher/develop
+# without overwriting custom edits on main.
+# - develop: fast-forward only (pristine mirror, never commit here)
+# - main: merge develop (preserves edits; opens PR on conflict)
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # daily 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Configure git
+        run: |
+          git config user.name "haemoglobin-sync[bot]"
+          git config user.email "haemoglobin-sync[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/PrismLauncher/PrismLauncher.git || true
+          git fetch upstream --prune
+          git fetch origin develop:refs/remotes/origin/develop || true
+
+      - name: Fast-forward develop
+        run: |
+          git checkout develop || git checkout -b develop origin/develop
+          git merge --ff-only upstream/develop
+          git push origin develop
+
+      - name: Merge develop into main
+        id: merge
+        run: |
+          git checkout main
+          if git merge --no-edit origin/develop; then
+            echo "conflict=false" >> "$GITHUB_OUTPUT"
+            git push origin main
+          else
+            echo "conflict=true" >> "$GITHUB_OUTPUT"
+            git merge --abort || true
+            # Create/update a conflict-resolution branch
+            git checkout -B sync/upstream-develop main
+            if ! git merge --no-edit origin/develop; then
+              echo "Conflicts present, leaving them in sync/upstream-develop for manual resolution"
+            fi
+            git config user.name "haemoglobin-sync[bot]"
+            git add -A || true
+            # commit even with conflicts markers so PR shows them
+            git -c user.name="haemoglobin-sync[bot]" -c user.email="haemoglobin-sync[bot]@users.noreply.github.com" commit -m "Sync upstream/develop (conflicts need manual resolution)" || true
+            git push -u origin sync/upstream-develop --force-with-lease
+          fi
+
+      - name: Open PR on conflict
+        if: steps.merge.outputs.conflict == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              head: `${context.repo.owner}:sync/upstream-develop`,
+              base: 'main',
+              state: 'open'
+            });
+            if (prs.length === 0) {
+              await github.rest.pulls.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                head: 'sync/upstream-develop',
+                base: 'main',
+                title: 'Sync upstream/develop (resolve conflicts)',
+                body: 'Automatic merge of PrismLauncher/develop had conflicts. Resolve them in `sync/upstream-develop`, then merge into `main`. Your edits were NOT overwritten — Git left conflict markers for manual review.'
+              });
+            }
