@@ -21,7 +21,7 @@ Write-Host "Starting branch: $branch"
 Run-Git @("fetch", "upstream", "--prune")
 Run-Git @("submodule", "update", "--init", "--recursive")
 
-# 2. Fast-forward pristine develop (fails if develop has custom commits — intentional)
+# 2. Fast-forward pristine develop (fails if develop has custom commits - intentional)
 Run-Git @("checkout", "develop")
 try {
     Run-Git @("merge", "--ff-only", "upstream/develop")
@@ -43,8 +43,8 @@ try {
     Write-Host "main merged with develop cleanly." -ForegroundColor Green
 } catch {
     Write-Host ""
-    Write-Host "Merge conflicts — your edits were NOT overwritten." -ForegroundColor Yellow
-    Write-Host "Resolve with: git status, edit files, git add <files>, git commit" -ForegroundColor Yellow
+    Write-Host "Merge conflicts - your edits were NOT overwritten." -ForegroundColor Yellow
+    Write-Host "Resolve with: git status, edit files, git add files, git commit" -ForegroundColor Yellow
     throw $_
 }
 
