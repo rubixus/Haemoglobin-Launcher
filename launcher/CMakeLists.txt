@@ -69,7 +69,7 @@ set(CORE_SOURCES
     FileSystem.h
     FileSystem.cpp
 
-    Exception.h
+    Result.h
 
     # RW lock protected map
     RWStorage.h
@@ -584,7 +584,7 @@ set(LINKEXE_SOURCES
     filelink/FileLink.cpp
     FileSystem.h
     FileSystem.cpp
-    Exception.h
+    Result.h
     StringUtils.h
     StringUtils.cpp
     DesktopServices.h
@@ -1265,10 +1265,10 @@ else()
     target_link_libraries(Launcher_logic LibArchive::LibArchive)
 endif()
 
-if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    target_link_libraries(Launcher_logic
-        gamemode
-    )
+if (Launcher_ENABLE_GAMEMODE)
+    target_link_libraries(Launcher_logic PkgConfig::gamemode)
+    # Must be public
+    target_compile_definitions(Launcher_logic PUBLIC ENABLE_GAMEMODE)
 endif()
 
 target_link_libraries(Launcher_logic
